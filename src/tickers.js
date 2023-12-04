@@ -137,3 +137,66 @@ function newHpTicker(tickers, object, hp, seconds, onFinish) {
     }
     tickers.push(updatePosition);
 }
+
+function newVisibilityTicker(tickers, object, seconds, flickerInterval, onFinish) {
+    const startTime = Date.now();
+
+    let counter = 0;
+    function updateVisibility() {
+        const elapsedTime = (Date.now() - startTime) / 1000; // Convert to seconds
+
+        // Check if the animation is complete
+        if (elapsedTime >= seconds) {
+            object.visible = true; // Ensure the object is visible at the end
+            if (onFinish !== null) {
+                onFinish();
+            }
+            return true; // Stop the animation
+        }
+
+        const currentTime = (Date.now() - startTime) / 1000;
+        if (currentTime % flickerInterval < flickerInterval / 2) {
+            // Turn visibility on for the first half of the interval
+            object.visible = true;
+        } else {
+            // Turn visibility off for the second half of the interval
+            object.visible = false;
+        }
+
+        return false;
+    }
+
+    tickers.push(updateVisibility);
+}
+
+function newColorTicker(tickers, object, seconds, flickerInterval, onFinish) {
+    const startTime = Date.now();
+
+    let counter = 0;
+    function updateVisibility() {
+        const elapsedTime = (Date.now() - startTime) / 1000; // Convert to seconds
+
+        // Check if the animation is complete
+        if (elapsedTime >= seconds) {
+            object.color = 'transparent'; // Ensure the object is visible at the end
+            if (onFinish !== null) {
+                onFinish();
+            }
+            return true; // Stop the animation
+        }
+
+        const currentTime = (Date.now() - startTime) / 1000;
+        const colors = ['black', 'black', 'white', 'black', 'black', 'transparent', 'black', 'black'];
+        for (let i = 0; i < colors.length; i++) {
+            const element = colors[i];
+            if (currentTime % flickerInterval < flickerInterval * ((i + 1) / colors.length)) {
+                object.color = element;
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    tickers.push(updateVisibility);
+}

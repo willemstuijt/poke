@@ -1,20 +1,21 @@
-function newWorld(assets) {
-    // Define collidable areas
-    const collidables = [
-        { x: 362, y: 448, width: 60, height: 52 },
-        // Add more rectangles here
-    ];
+let origPos = [];
+allEnemies.forEach(e => {
+    origPos.push({ x: e.x, y: e.y, direction: e.direction })
+});
 
+function newWorld(assets) {
     // Define the character
     const character = {
         sprite: assets.world.character,
-        width: 31, // Width of one frame
-        height: 32, // Height of one frame
-        x: 512, // Starting x position
-        y: 576, // Starting y position
+        width: charWidth, // Width of one frame
+        height: charHeight, // Height of one frame
+        frameW: 16,
+        frameH: 17,
+        x: worldWidth / 2 - charWidth / 2, // Starting x position
+        y: worldHeight * 0.55, // Starting y position
         speed: 2, // Movement speed
         direction: 'down', // Initial direction
-        frameIndex: 1, // Current frame index in the sprite sheet
+        frameIndex: 0, // Current frame index in the sprite sheet
         tickCount: 0, // Counts the number of updates since the last frame change
         ticksPerFrame: 10, // Number of updates required to change the frame
         numberOfFrames: 3, // Number of frames for the animation
@@ -23,17 +24,34 @@ function newWorld(assets) {
     // Define the enemies
     const enemies = allEnemies;
     // Additional properties for the enemies for animation
+    for (let i = 0; i < allEnemies.length; i++) {
+        const e = allEnemies[i];
+        e.x = origPos[i].x;
+        e.y = origPos[i].y;
+        e.direction = origPos[i].direction;
+    }
     enemies.forEach(enemy => {
+        if (!Object.hasOwn(enemy, 'boss')) {
+            enemy.boss = false;
+        }
         enemy.hp = enemy.totalHp;
+        enemy.origX = enemy.x;
+        enemy.origY = enemy.y;
+        enemy.origDir = enemy.direction;
         enemy.width = character.width;
         enemy.height = character.height;
+        enemy.frameW = character.frameW;
+        enemy.frameH = character.frameH;
         enemy.triggerDist = 0;
         enemy.triggered = false;
         enemy.surprised = false;
         enemy.readyToFight = false;
         enemy.fought = false;
+        enemy.returning = false;
+        enemy.talked = false;
+        enemy.rematch = false;
         enemy.speed = 2; // Movement speed
-        enemy.frameIndex = 1; // Frame index for walking animation
+        enemy.frameIndex = 0; // Frame index for walking animation
         enemy.tickCount = 0; // Counter for updating frames
         enemy.ticksPerFrame = 10; // Number of ticks before changing frames
         enemy.numberOfFrames = 3; // Number of frames for the animation
@@ -44,14 +62,18 @@ function newWorld(assets) {
 
     // Handle keyboard input
     const keys = {
+        disabled: false,
         right: false,
         left: false,
         up: false,
         down: false,
+        space: false,
     };
 
     return {
-        debug: true, // Enable or disable debug mode
+        frameCount: 0,
+        elapsedTime: 0,
+        debug: drawCollidables, // Enable or disable debug mode
         gamePaused: false, // A flag to pause the game for the encounter
         gameWorld: assets.world.background,
         collidables: collidables,
@@ -62,28 +84,35 @@ function newWorld(assets) {
 
         keys: keys,
         keydownListener: (e) => {
-            if (e.key === 'ArrowRight') { keys.right = true; character.direction = 'right'; }
-            if (e.key === 'ArrowLeft') { keys.left = true; character.direction = 'left'; }
-            if (e.key === 'ArrowUp') { keys.up = true; character.direction = 'up'; }
-            if (e.key === 'ArrowDown') { keys.down = true; character.direction = 'down'; }
+            if (!keys.disabled) {
+                if (e.key === 'ArrowRight') { keys.right = true; character.direction = 'right'; }
+                if (e.key === 'ArrowLeft') { keys.left = true; character.direction = 'left'; }
+                if (e.key === 'ArrowUp') { keys.up = true; character.direction = 'up'; }
+                if (e.key === 'ArrowDown') { keys.down = true; character.direction = 'down'; }
+                if (e.key === ' ' || e.key == 'Enter') { keys.space = true; }
+            }
         },
         keyupListener: (e) => {
-            if (e.key === 'ArrowRight') { keys.right = false; character.frameIndex = 1; }
-            if (e.key === 'ArrowLeft') { keys.left = false; character.frameIndex = 1; }
-            if (e.key === 'ArrowUp') { keys.up = false; character.frameIndex = 1; }
-            if (e.key === 'ArrowDown') { keys.down = false; character.frameIndex = 1; }
+            if (e.key === 'ArrowRight') { keys.right = false; character.frameIndex = 0; }
+            if (e.key === 'ArrowLeft') { keys.left = false; character.frameIndex = 0; }
+            if (e.key === 'ArrowUp') { keys.up = false; character.frameIndex = 0; }
+            if (e.key === 'ArrowDown') { keys.down = false; character.frameIndex = 0; }
+            if (e.key === ' ' || e.key == 'Enter') { keys.space = false; }
         },
     };
 }
 
+
 // Plays the world, returning when there is a battle
-function playWorld(canvas, ctx, world, onBattle) {
+function playWorld(canvas, ctx, world, onBattle, lostAgainst) {
     const debug = world.debug;
     const gameWorld = world.gameWorld;
     const character = world.character;
     const collidables = world.collidables;
     const enemies = world.enemies;
     const keys = world.keys;
+
+    let startTime = performance.now();
 
     world.gamePaused = false;
     setSong(audio.world);
@@ -100,66 +129,193 @@ function playWorld(canvas, ctx, world, onBattle) {
         height: character.height,
     };
 
+    function returnEnemyToPlace(enemy) {
+        enemy.rematch = true;
+        enemy.returning = true;
+        enemy.triggered = false;
+        enemy.surprised = false;
+        enemy.fought = false;
+        enemy.readyToFight = false;
+        enemy.direction = oppositeDirection(enemy.direction);
+        if (enemy.talked) {
+            enemy.talked = false;
+            enemy.direction = enemy.origDir;
+            return;
+        }
+
+        switch (enemy.direction) {
+            case 'up':
+                enemy.triggerDist = enemy.origY - character.height * 0.5 - enemy.y;
+                break;
+            case 'down':
+                enemy.triggerDist = enemy.origY + character.height * 0.5 - enemy.y;
+                break;
+            case 'left':
+                enemy.triggerDist = enemy.origX - character.width * 0.5 - enemy.x;
+                break;
+            case 'right':
+                enemy.triggerDist = enemy.origX + character.width * 0.5 - enemy.x;
+                break;
+        }
+
+        keys.down = true;
+        character.direction = 'down';
+        newTimeTicker(world.tickers, 0.3, () => {
+            keys.down = false;
+            character.frameIndex = 0;
+        });
+
+        world.gamePaused = true;
+        keys.disabled = true;
+        exclamation.height = character.height * 0.3;
+
+        let now = performance.now();
+        let totalTime = now - startTime + world.elapsedTime;
+        let averageFrameTime = (totalTime / world.frameCount) / 1000;
+
+        newTimeTicker(world.tickers, (Math.abs(enemy.triggerDist) / enemy.speed) * averageFrameTime, () => {
+            enemy.returning = false;
+            enemy.direction = oppositeDirection(enemy.direction);
+            world.gamePaused = false;
+            keys.disabled = false;
+        });
+    }
+    if (lostAgainst) {
+        returnEnemyToPlace(lostAgainst);
+    }
+
+    function triggerEnemy(triggered) {
+
+        triggered.triggered = true;
+        if (triggered.surprised) {
+            return;
+        }
+        // exclamation trigger
+        setSong(null);
+        playEffect(audio.exclamation);
+
+        keys.up = false;
+        keys.down = false;
+        keys.left = false;
+        keys.right = false;
+        character.frameIndex = 0;
+
+        world.gamePaused = true;
+        keys.disabled = true;
+        exclamation.x = triggered.x;
+        exclamation.y = triggered.y - triggered.height * 1.6;
+        exclamation.show = true;
+        character.direction = oppositeDirection(triggered.direction);
+        exclamation.height = character.height * 0.3;
+        newPositionHeightTicker(world.tickers, exclamation, triggered.y - triggered.height * 1.2, character.height, 0.1, () => {
+            newTimeTicker(world.tickers, 0.9, () => {
+                // after exclamation
+                setSong(audio.encounter);
+                exclamation.show = false;
+                triggered.surprised = true;
+            });
+        });
+        // show dialog and then set surprised to true
+    }
+
+    const shroud = {
+        color: 'transparent',
+    };
+
     // Update game objects
     function update() {
         processTickers(world.tickers);
 
-        if (!world.gamePaused) {
-            character.tickCount += 1;
-            if (character.tickCount > character.ticksPerFrame) {
-                character.tickCount = 0;
-                // If the character is moving, update the frame index
-                if (keys.right || keys.left || keys.up || keys.down) {
-                    character.frameIndex = (character.frameIndex + 1) % character.numberOfFrames;
-                }
-            }
+        keys.disabled = world.gamePaused;
 
-            let newX = character.x;
-            let newY = character.y;
-
-            if (keys.right) newX += character.speed;
-            if (keys.left) newX -= character.speed;
-            if (keys.up) newY -= character.speed;
-            if (keys.down) newY += character.speed;
-
-            // Only update the character's position if they are not colliding
-            if (canMove([collidables, enemies], character, newX, newY)) {
-                character.x = newX;
-                character.y = newY;
-            }
-
-            const triggered = checkForEncounters(character, enemies);
-            if (triggered !== null) {
-                // exclamation trigger
-                setSong(null);
-                playEffect(audio.exclamation);
-
-                world.gamePaused = true;
-                exclamation.x = triggered.x;
-                exclamation.y = triggered.y - triggered.height * 1.6;
-                exclamation.show = true;
-                exclamation.height = character.height * 0.3;
-                newPositionHeightTicker(world.tickers, exclamation, triggered.y - triggered.height * 1.2, character.height, 0.1, () => {
-                    newTimeTicker(world.tickers, 0.9, () => {
-                        // after exclamation
-                        setSong(audio.battle);
-                        exclamation.show = false;
-                        triggered.surprised = true;
-                    });
-                });
-                // show dialog and then set surprised to true
+        character.tickCount += 1;
+        if (character.tickCount > character.ticksPerFrame) {
+            character.tickCount = 0;
+            // If the character is moving, update the frame index
+            if (keys.right || keys.left || keys.up || keys.down) {
+                character.frameIndex = (character.frameIndex + 1) % character.numberOfFrames;
             }
         }
+
+        let newX = character.x;
+        let newY = character.y;
+
+        if (keys.right) newX += character.speed;
+        if (keys.left) newX -= character.speed;
+        if (keys.up) newY -= character.speed;
+        if (keys.down) newY += character.speed;
+
+        if (!world.gamePaused) {
+            if (keys.space) {
+                let active = canActivate([collidables, enemies], character, newX, newY);
+                if (active) {
+                    keys.space = false;
+
+                    if (Object.hasOwn(active, 'direction')) {
+                        active.direction = oppositeDirection(character.direction);
+                    }
+                    if (Object.hasOwn(active, 'triggered') && !active.triggered) {
+                        active.talked = true;
+                        triggerEnemy(active);
+                        return;
+                    }
+                    if (!Object.hasOwn(active, 'spaceDialog')) {
+                        return;
+                    }
+
+                    world.gamePaused = true;
+
+                    showMultiTextDialog(world.tickers, active.spaceDialog, () => {
+                        hideDialog();
+                        world.gamePaused = false;
+                    });
+                }
+            }
+        }
+
+        // Only update the character's position if they are not colliding
+        if (canMove([collidables, enemies], character, newX, newY)) {
+            character.x = newX;
+            character.y = newY;
+
+            if (character.y < bossSongHeight && songPlaying(audio.world)) {
+                setSong(audio.bossWorld);
+            } else if (character.y > bossSongHeight && songPlaying(audio.bossWorld)) {
+                setSong(audio.world);
+            }
+        }
+
+        if (!world.gamePaused) {
+            const triggered = checkForEncounters(character, enemies);
+            if (triggered !== null) {
+                triggerEnemy(triggered);
+            }
+        }
+
         // Update the position of an approaching enemy
         enemies.forEach(enemy => {
-            if (enemy.triggered && enemy.surprised) {
+            if ((enemy.triggered && enemy.surprised) || enemy.returning) {
                 approachPlayer(character, enemy);
             }
             if (enemy.surprised && enemy.readyToFight && !enemy.fought) {
                 enemy.fought = true;
-                showMultiTextDialog(world.tickers, enemy.encounterDialog, () => {
+
+                let dialog = enemy.encounterDialog;
+                if (enemy.rematch && Object.hasOwn(enemy, 'rematchDialog')) {
+                    dialog = enemy.rematchDialog;
+                }
+
+                showMultiTextDialog(world.tickers, dialog, () => {
                     hideDialog();
-                    startBattle(enemy);
+                    if (enemy.boss) {
+                        setSong(audio.bossBattle);
+                    } else {
+                        setSong(audio.battle);
+                    }
+
+                    newColorTicker(world.tickers, shroud, 1.6, 0.20, () => {
+                        startBattle(enemy);
+                    });
                 });
             }
         });
@@ -167,6 +323,8 @@ function playWorld(canvas, ctx, world, onBattle) {
 
     // Draw game objects
     function draw() {
+        world.frameCount++;
+
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -178,7 +336,9 @@ function playWorld(canvas, ctx, world, onBattle) {
         ctx.drawImage(
             gameWorld,
             viewPortX - character.x, // Adjusted x position
-            viewPortY - character.y  // Adjusted y position
+            viewPortY - character.y,  // Adjusted y position
+            worldWidth,
+            worldHeight,
         );
 
         // Draw collidables for debugging
@@ -197,14 +357,16 @@ function playWorld(canvas, ctx, world, onBattle) {
         // Draw the character at the center of the viewport
         ctx.drawImage(
             character.sprite,
-            character.frameIndex * character.width,
-            getDirectionRow(character.direction, character.height),
-            character.width,
-            character.height,
+
+            getDirectionCol(character.direction, character.frameW),
+            character.frameIndex * character.frameH,
+
+            character.frameW,
+            character.frameH,
             viewPortX, // Centered x position
             viewPortY, // Centered y position
             character.width,
-            character.height
+            character.height,
         );
 
         // Draw enemies with animation
@@ -215,11 +377,23 @@ function playWorld(canvas, ctx, world, onBattle) {
         }
 
         renderDialogBox(canvas, ctx);
+
+        if (shroud.color !== 'transparent') {
+            ctx.fillStyle = shroud.color;
+            ctx.fillRect(
+                0, // Adjusted x position
+                0, // Adjusted y position
+                canvas.width,
+                canvas.height
+            );
+        }
     }
 
     function startBattle(enemy) {
         stopGameLoop();
-        onBattle(enemy)
+        let now = performance.now();
+        world.elapsedTime += now - startTime;
+        onBattle(enemy);
     }
 
 

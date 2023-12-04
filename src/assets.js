@@ -17,17 +17,44 @@ function allImages() {
     worldSong.src = audioPath + 'world.ogg';
     const battleSong = new Audio();
     battleSong.src = audioPath + 'battle.ogg';
+    const encounterSong = new Audio();
+    encounterSong.src = audioPath + 'encounter.ogg';
+    const victorySong = new Audio();
+    victorySong.src = audioPath + 'victory.ogg';
+    const defeatSong = new Audio();
+    defeatSong.src = audioPath + 'defeat.ogg';
+    const bossBattleSong = new Audio();
+    bossBattleSong.src = audioPath + 'bossBattle.ogg';
+    const bossWorldSong = new Audio();
+    bossWorldSong.src = audioPath + 'bossWorld.ogg';
+    const bossVictorySong = new Audio();
+    bossVictorySong.src = audioPath + 'bossVictory.ogg';
 
     const exclamationEffect = new Audio();
     exclamationEffect.src = audioPath + 'exclamation.wav';
+    const attackEffect = new Audio();
+    attackEffect.src = audioPath + 'attack.wav';
+    const superEffective = new Audio();
+    superEffective.src = audioPath + 'superEffective.wav';
+    const clickEffect = new Audio();
+    clickEffect.src = audioPath + 'click.wav';
 
     obj = {
         audio: {
             opening: openingSong,
             world: worldSong,
             battle: battleSong,
+            encounter: encounterSong,
+            victory: victorySong,
+            defeat: defeatSong,
+            bossBattle: bossBattleSong,
+            bossWorld: bossWorldSong,
+            bossVictory: bossVictorySong,
 
             exclamation: exclamationEffect,
+            attack: attackEffect,
+            superEffective: superEffective,
+            click: clickEffect,
         },
         world: {
             background: gameWorld,

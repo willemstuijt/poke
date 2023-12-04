@@ -15,6 +15,11 @@
             background-color: black;
         }
 
+        @font-face {
+            font-family: 'PressStart';
+            src: url('assets/font.ttf') format('truetype');
+        }
+
         canvas {
             border: 1px solid white;
         }
@@ -23,14 +28,16 @@
 
 <body>
     <canvas id="gameCanvas"></canvas>
+    <script src="src/consts.js"></script>
     <script src="src/enemyList.js"></script>
+    <script src="src/collidableList.js"></script>
     <script src="src/audio.js"></script>
     <script src="src/disclaimer.js"></script>
     <script src="src/assets.js"></script>
     <script src="src/dialogBox.js"></script>
     <script src="src/loading.js"></script>
     <script src="src/mainMenu.js"></script>
-    <script src="src/consts.js"></script>
+    <script src="src/endMenu.js"></script>
     <script src="src/battle.js"></script>
     <script src="src/collidables.js"></script>
     <script src="src/enemies.js"></script>

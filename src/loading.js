@@ -12,7 +12,6 @@ function loadingScreen(canvas, ctx, onLoad, onDone) {
 
     var lastFrame;
     function draw() {
-        console.log(running);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         ctx.beginPath();

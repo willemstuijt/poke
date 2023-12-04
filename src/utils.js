@@ -9,6 +9,23 @@ function getDirectionRow(direction, height) {
     };
     return directionRows[direction] * height;
 }
+function getDirectionCol(direction, width) {
+    const directionRows = {
+        'down': 0,
+        'right': 1,
+        'up': 2,
+        'left': 3
+    };
+    return directionRows[direction] * width;
+}
+function oppositeDirection(direction) {
+    switch (direction) {
+        case 'up': return 'down';
+        case 'down': return 'up';
+        case 'left': return 'right';
+        case 'right': return 'left';
+    }
+}
 
 function drawRoundedRect(ctx, x, y, width, height, radius, fill, stroke, strokeWidth) {
     ctx.beginPath();
@@ -31,7 +48,7 @@ function drawRoundedRect(ctx, x, y, width, height, radius, fill, stroke, strokeW
 }
 
 function renderTextWithLastCharDifferent(ctx, text, x, y, maxWidth, primaryColor, lastCharColor) {
-    ctx.font = '28px Arial'; // Set your desired font
+    ctx.font = '20px PressStart'; // Set your desired font
     const lineHeight = 28; // Adjust line height as needed
     const lines = wrapText(ctx, text, maxWidth);
 
@@ -78,6 +95,9 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 function drawObject(ctx, obj) {
+    if (Object.hasOwn(obj, 'visible') && !obj.visible) {
+        return;
+    }
     ctx.drawImage(obj.sprite, obj.x, obj.y, obj.width, obj.height);
 }
 

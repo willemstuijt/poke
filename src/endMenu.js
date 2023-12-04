@@ -1,11 +1,14 @@
-function mainMenu(canvas, ctx, onPlay) {
-    setSong(audio.opening);
-
+function endMenu(canvas, ctx, won, onFinish) {
     // Game logo text
-    const logoText = "Negotiations";
+    let logoText;
+    if (won) {
+        logoText = "Victory";
+    } else {
+        logoText = "Game Over";
+    }
 
     // Menu options
-    const menuOptions = ["Play Game"];
+    const menuOptions = ["Main Menu"];
     let selectedOption = 0;
 
     function drawMenu() {
@@ -31,7 +34,7 @@ function mainMenu(canvas, ctx, onPlay) {
     function handleKeyPress(event) {
         if (event.key === "Enter") {
             window.removeEventListener('keydown', handleKeyPress);
-            onPlay();
+            onFinish();
         }
     }
     // Initial draw

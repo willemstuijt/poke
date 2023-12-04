@@ -13,7 +13,7 @@ function approachPlayer(player, enemy) {
     // Stop approaching when close
     if (Math.abs(enemy.triggerDist) < player.width) {
         enemy.readyToFight = true;
-        enemy.frameIndex = 1;
+        enemy.frameIndex = 0;
         return true;
     }
 
@@ -37,28 +37,32 @@ function approachPlayer(player, enemy) {
     enemy.y += deltaY;
 }
 
+function floatEq(a, b) {
+    return Math.abs(a - b) <= 1.5;
+}
+
 // Check for enemy encounters
 function checkForEncounters(character, enemies) {
     var triggered = null;
     enemies.forEach(enemy => {
-        if (!enemy.triggered) {
+        if (!enemy.triggered && enemy.autoActivate) {
             // Check if the player is in front of the enemy based on enemy's direction
             let inFront = false;
             switch (enemy.direction) {
                 case 'up':
-                    inFront = character.x === enemy.x && character.y < enemy.y;
+                    inFront = floatEq(character.x, enemy.x) && character.y < enemy.y;
                     enemy.triggerDist = character.y - enemy.y;
                     break;
                 case 'down':
-                    inFront = character.x === enemy.x && character.y > enemy.y;
+                    inFront = floatEq(character.x, enemy.x) && character.y > enemy.y;
                     enemy.triggerDist = character.y - enemy.y;
                     break;
                 case 'left':
-                    inFront = character.y === enemy.y && character.x < enemy.x;
+                    inFront = floatEq(character.y, enemy.y) && character.x < enemy.x;
                     enemy.triggerDist = character.x - enemy.x;
                     break;
                 case 'right':
-                    inFront = character.y === enemy.y && character.x > enemy.x;
+                    inFront = floatEq(character.y, enemy.y) && character.x > enemy.x;
                     enemy.triggerDist = character.x - enemy.x;
                     break;
             }
@@ -73,17 +77,17 @@ function checkForEncounters(character, enemies) {
 }
 
 function enemyDraw(enemySprite, character, viewPortX, viewPortY, ctx, enemy) {
-    if (enemy.triggered) {
-        // Calculate the row position of the current direction in the sprite sheet
-        const directionRow = getDirectionRow(enemy.direction, enemy.height);
+    if (enemy.triggered || enemy.returning) {
 
         // Draw the animated enemy sprite
         ctx.drawImage(
             enemySprite,
-            enemy.frameIndex * enemy.width, // Source x position based on frame index
-            directionRow, // Source y position based on direction
-            enemy.width,
-            enemy.height,
+
+            getDirectionCol(enemy.direction, enemy.frameW),
+            enemy.frameIndex * enemy.frameH,
+
+            enemy.frameW,
+            enemy.frameH,
             enemy.x + viewPortX - character.x,
             enemy.y + viewPortY - character.y,
             enemy.width,
@@ -93,10 +97,12 @@ function enemyDraw(enemySprite, character, viewPortX, viewPortY, ctx, enemy) {
         // Draw the static enemy sprite
         ctx.drawImage(
             enemySprite,
-            1 * enemy.width, // Source x position for static frame
-            getDirectionRow(enemy.direction, enemy.height), // Source y position based on direction
-            enemy.width,
-            enemy.height,
+
+            getDirectionCol(enemy.direction, enemy.frameW),
+            0 * enemy.frameH,
+
+            enemy.frameW,
+            enemy.frameH,
             enemy.x + viewPortX - character.x,
             enemy.y + viewPortY - character.y,
             enemy.width,

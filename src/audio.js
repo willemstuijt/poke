@@ -15,7 +15,14 @@ function playAudioObject(obj) {
     obj.play();
 }
 
+function songPlaying(song) {
+    return currentSong === song;
+}
+
 function setSong(song) {
+    if (currentSong === song) {
+        return;
+    }
     if (currentSong !== null) {
         currentSong.pause();
     }

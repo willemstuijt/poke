@@ -1,6 +1,7 @@
 
 function newBattle(enemy) {
     return {
+        worldEnemy: enemy,
         player: {
             sprite: enemy.playerSprite,
             name: enemy.playerName,
@@ -8,6 +9,7 @@ function newBattle(enemy) {
             hp: enemy.playerHp,
             superEffective: enemy.playerMoveOrder,
             moves: enemy.playerMoves,
+            visible: true,
         },
         enemy: {
             sprite: enemy.battleSprite,
@@ -17,25 +19,26 @@ function newBattle(enemy) {
             moves: enemy.moves,
             victoryDialog: enemy.victoryDialog,
             defeatDialog: enemy.defeatDialog,
+            visible: true,
         },
         lastMoves: [],
         tickers: [],
     }
 }
 
-function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
+function playBattle(canvas, ctx, sprites, battle, onBattleOver, onEndMenu) {
     sprites = sprites.battles;
 
     const tickers = battle.tickers;
 
     const playerW = 150;
     const playerH = 150;
-    const playerPos = { sprite: battle.player.sprite, width: playerW, height: playerH, x: canvas.width + playerW, y: canvas.height - playerH * 2 };
+    const playerPos = { visible: true, sprite: battle.player.sprite, width: playerW, height: playerH, x: canvas.width + playerW, y: canvas.height - playerH * 2 };
 
     const s = 1.4
     const enemyW = 100 * s;
     const enemyH = 150 * s;
-    const enemyPos = { sprite: battle.enemy.sprite, width: enemyW, height: enemyH, x: - enemyW, y: 50 };
+    const enemyPos = { visible: true, sprite: battle.enemy.sprite, width: enemyW, height: enemyH, x: - enemyW, y: 50 };
 
     const player = battle.player;
     const enemy = battle.enemy;
@@ -65,7 +68,7 @@ function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
     }
 
     function drawMoves(moves) {
-        ctx.font = '24px Arial'; // Set your desired font
+        ctx.font = '20px PressStart'; // Set your desired font
         for (let row = 0; row < moves.length; row++) {
             for (let col = 0; col < moves[row].length; col++) {
                 if (row === selectedRow && col === selectedCol) {
@@ -78,10 +81,29 @@ function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
         }
     }
 
-    function battleOver() {
+    function battleOver(lost) {
         running = false;
         window.removeEventListener('keydown', movesListener);
-        onBattleOver();
+
+        if (!lost && battle.worldEnemy.boss) {
+            onEndMenu(lost);
+            return;
+        }
+
+        if (lost) {
+            onBattleOver(battle.worldEnemy);
+        } else {
+            onBattleOver(null);
+        }
+    }
+
+    function animateAttack(player, superEffective) {
+        if (superEffective) {
+            playEffect(audio.superEffective);
+        } else {
+            playEffect(audio.attack);
+        }
+        newVisibilityTicker(tickers, player, 0.8, 0.25, null);
     }
 
     function inflictDamage(player, dmg, onDone) {
@@ -89,15 +111,23 @@ function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
         if (final <= 0) {
             final = 0;
             let dialog;
-            if (player == enemy) {
+            let song;
+            let lost = player !== enemy;
+            if (!lost) {
                 // Ganar
+                song = audio.victory;
+                if (battle.worldEnemy.boss) {
+                    song = audio.bossVictory;
+                }
                 dialog = enemy.victoryDialog;
             } else {
                 // Perder
+                song = audio.defeat;
                 dialog = enemy.defeatDialog;
             }
             onDone = () => {
-                showMultiTextDialog(tickers, dialog, battleOver);
+                setSong(song);
+                showMultiTextDialog(tickers, dialog, () => battleOver(lost));
             }
         }
         newHpTicker(tickers, player, final, 1, onDone);
@@ -110,6 +140,7 @@ function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
         currentOpponentMove = (currentOpponentMove + 1) % enemy.moves.length;
         const move = enemy.moves[currentOpponentMove];
         showFixedDialog(tickers, enemy.name + " uses '" + move.name + "'", 0.4, () => {
+            animateAttack(player, false);
             inflictDamage(player, move.dmg, () => {
                 hideDialog();
                 startPlayerTurn();
@@ -131,6 +162,8 @@ function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
 
         playerTurn = false;
         showFixedDialog(tickers, player.name + " uses '" + move.name + "'", 0.8, () => {
+            animateAttack(enemy, superEffective);
+
             let dmg = move.dmg;
             if (superEffective) {
                 dmg *= 2;
@@ -144,7 +177,7 @@ function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
             if (superEffective) {
                 showFixedDialog(tickers, "Its super effective!", 0, performDmg);
             } else {
-                performDmg();
+                showFixedDialog(tickers, "Its not very effective.", 0, performDmg);
             }
         });
     }
@@ -153,19 +186,21 @@ function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
         if (playerTurn) {
             switch (event.key) {
                 case 'ArrowDown':
-                    if (selectedRow < moves.length - 1) selectedRow++;
+                    if (selectedRow < moves.length - 1) { selectedRow++; playEffect(audio.click); }
                     break;
                 case 'ArrowUp':
-                    if (selectedRow > 0) selectedRow--;
+                    if (selectedRow > 0) { selectedRow--; playEffect(audio.click); }
                     break;
                 case 'ArrowRight':
-                    if (selectedCol < moves[selectedRow].length - 1) selectedCol++;
+                    if (selectedCol < moves[selectedRow].length - 1) { selectedCol++; playEffect(audio.click); }
                     break;
                 case 'ArrowLeft':
-                    if (selectedCol > 0) selectedCol--;
+                    if (selectedCol > 0) { selectedCol--; playEffect(audio.click); }
                     break;
                 case 'Enter':
+                case ' ':
                     attackOpponent(moves[selectedRow][selectedCol])
+                    playEffect(audio.click);
                     break;
             }
         }
@@ -179,6 +214,8 @@ function playBattle(canvas, ctx, sprites, battle, onBattleOver) {
         // Draw background
         ctx.drawImage(sprites.background, 0, -100, canvas.width, canvas.height);
 
+        playerPos.visible = player.visible;
+        enemyPos.visible = enemy.visible;
         drawObject(ctx, playerPos);
         drawObject(ctx, enemyPos);
 

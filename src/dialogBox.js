@@ -42,6 +42,7 @@ function renderDialogBox(canvas, ctx) {
 }
 
 function showFixedDialog(tickers, dialog, wait, onDone) {
+    msgBox.message = "";
     msgBox.visible = true;
     msgBox.next = false;
     let afterWait = onDone;
@@ -59,6 +60,7 @@ function hideDialog() {
 }
 
 function showMultiTextDialog(tickers, dialogs, onDone) {
+    msgBox.message = "";
     msgBox.visible = true;
 
     var idx = -1;
@@ -84,7 +86,8 @@ function showMultiTextDialog(tickers, dialogs, onDone) {
     }
 
     listener = (event) => {
-        if (event.key === "Enter" && msgBox.next) {
+        if ((event.key === ' ' || event.key === "Enter") && msgBox.next) {
+            playEffect(audio.click);
             next();
         }
     };
